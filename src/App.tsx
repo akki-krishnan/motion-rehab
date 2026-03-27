@@ -12,6 +12,8 @@ function getHipY(landmarks: any) {
 function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hipStateRef = useRef<"up" | "down">("down");
+  const baselineHipYRef = useRef<number | null>(null);
 
   const [message, setMessage] = useState("Checking camera...");
   const [exercise] = useState("Glute Bridge");
@@ -72,7 +74,23 @@ function App() {
             }
 
             const hipY = getHipY(results.poseLandmarks);
-            console.log("Hip Y:", hipY);
+
+            if (hipY !== null) {
+              if (baselineHipYRef.current === null) {
+                baselineHipYRef.current = hipY;
+              }
+
+              const baseline = baselineHipYRef.current;
+              const threshold = 0.05;
+
+              if (hipY < baseline - threshold) {
+                hipStateRef.current = "up";
+              } else {
+                hipStateRef.current = "down";
+              }
+
+              console.log("Hip Y:", hipY, "State:", hipStateRef.current);
+            }
           }
         });
 
@@ -136,6 +154,8 @@ function App() {
           onClick={() => {
             setStatus("Session started");
             setReps(0);
+            baselineHipYRef.current = null;
+            hipStateRef.current = "down";
           }}
           style={{
             marginTop: "12px",
