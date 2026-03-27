@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [message, setMessage] = useState("Checking camera...");
-  const [exercise] = useState("Glute Bridge");
+  const [exercise, setExercise] = useState("Glute Bridge");
 
   useEffect(() => {
     async function startCamera() {
@@ -94,8 +94,33 @@ function App() {
             }}
           >
             <h2 style={{ marginTop: 0 }}>Session</h2>
+
+            <label
+              htmlFor="exercise"
+              style={{ display: "block", marginBottom: "8px", fontWeight: 700 }}
+            >
+              Exercise
+            </label>
+
+            <select
+              id="exercise"
+              value={exercise}
+              onChange={(e) => setExercise(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "10px",
+                border: "1px solid #cbd5e1",
+                marginBottom: "16px",
+              }}
+            >
+              <option>Glute Bridge</option>
+              <option>Bird Dog</option>
+              <option>Bodyweight Squat</option>
+            </select>
+
             <p>
-              <strong>Exercise:</strong> {exercise}
+              <strong>Selected:</strong> {exercise}
             </p>
             <p>
               <strong>Status:</strong> Ready
