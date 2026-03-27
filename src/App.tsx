@@ -1,15 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 
+function getHipY(landmarks: any) {
+  if (!landmarks) return null;
+
+  const leftHip = landmarks[23];
+  const rightHip = landmarks[24];
+
+  return (leftHip.y + rightHip.y) / 2;
+}
+
 function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
   const [message, setMessage] = useState("Checking camera...");
-  const [exercise, setExercise] = useState("Glute Bridge");
+  const [exercise] = useState("Glute Bridge");
+  const [status, setStatus] = useState("Ready");
+  const [reps, setReps] = useState(0);
 
   useEffect(() => {
-    async function startCamera() {
+    async function setupPose() {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          setMessage("Camera API is not available in this browser.");
+          setMessage("Camera API is not available.");
           return;
         }
 
@@ -21,132 +34,121 @@ function App() {
           videoRef.current.srcObject = stream;
         }
 
-        setMessage("Camera is working.");
-      } catch (error) {
-        console.error("Error accessing camera:", error);
-        setMessage(
-          "No camera found or permission denied. This is okay for now on desktop."
-        );
+        const pose = new (window as any).Pose({
+          locateFile: (file: string) =>
+            `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+        });
+
+        pose.setOptions({
+          modelComplexity: 0,
+          smoothLandmarks: true,
+          enableSegmentation: false,
+        });
+
+        pose.onResults((results: any) => {
+          const canvas = canvasRef.current;
+          const video = videoRef.current;
+          const ctx = canvas?.getContext("2d");
+
+          if (!canvas || !ctx || !video) return;
+
+          canvas.width = video.videoWidth || 640;
+          canvas.height = video.videoHeight || 480;
+
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          if (results.poseLandmarks) {
+            for (const lm of results.poseLandmarks) {
+              ctx.beginPath();
+              ctx.arc(
+                lm.x * canvas.width,
+                lm.y * canvas.height,
+                5,
+                0,
+                2 * Math.PI
+              );
+              ctx.fillStyle = "red";
+              ctx.fill();
+            }
+
+            const hipY = getHipY(results.poseLandmarks);
+            console.log("Hip Y:", hipY);
+          }
+        });
+
+        async function detect() {
+          if (videoRef.current && videoRef.current.readyState >= 2) {
+            await pose.send({ image: videoRef.current });
+          }
+          requestAnimationFrame(detect);
+        }
+
+        detect();
+        setMessage("Pose system ready.");
+      } catch (err) {
+        console.error(err);
+        setMessage("No camera available (desktop is fine).");
       }
     }
 
-    startCamera();
+    setupPose();
   }, []);
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f8fafc",
-        padding: "32px",
-        fontFamily: "Arial, sans-serif",
-        color: "#0f172a",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "900px",
-          margin: "0 auto",
-        }}
-      >
-        <h1 style={{ fontSize: "40px", marginBottom: "8px" }}>Motion Rehab</h1>
-        <p style={{ fontSize: "18px", color: "#475569", marginBottom: "24px" }}>
-          AI-assisted rehab coaching for better exercise form.
+    <main style={{ padding: "32px", fontFamily: "Arial, sans-serif" }}>
+      <h1>Motion Rehab</h1>
+      <p>{message}</p>
+
+      <div style={{ position: "relative", width: "400px" }}>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          style={{
+            width: "100%",
+            background: "#dbe4ee",
+            borderRadius: "12px",
+          }}
+        />
+        <canvas
+          ref={canvasRef}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+          }}
+        />
+      </div>
+
+      <div style={{ marginTop: "20px" }}>
+        <p>
+          <strong>Exercise:</strong> {exercise}
+        </p>
+        <p>
+          <strong>Status:</strong> {status}
+        </p>
+        <p>
+          <strong>Reps:</strong> {reps}
         </p>
 
-        <div
+        <button
+          onClick={() => {
+            setStatus("Session started");
+            setReps(0);
+          }}
           style={{
-            display: "grid",
-            gridTemplateColumns: "1.2fr 0.8fr",
-            gap: "24px",
+            marginTop: "12px",
+            padding: "12px 16px",
+            borderRadius: "10px",
+            border: "none",
+            background: "#0f172a",
+            color: "white",
+            cursor: "pointer",
           }}
         >
-          <div
-            style={{
-              background: "white",
-              borderRadius: "16px",
-              padding: "20px",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
-            }}
-          >
-            <h2 style={{ marginTop: 0 }}>Camera Preview</h2>
-            <p style={{ color: "#475569" }}>{message}</p>
-
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              style={{
-                width: "100%",
-                marginTop: "16px",
-                background: "#dbe4ee",
-                borderRadius: "12px",
-              }}
-            />
-          </div>
-
-          <div
-            style={{
-              background: "white",
-              borderRadius: "16px",
-              padding: "20px",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
-            }}
-          >
-            <h2 style={{ marginTop: 0 }}>Session</h2>
-
-            <label
-              htmlFor="exercise"
-              style={{ display: "block", marginBottom: "8px", fontWeight: 700 }}
-            >
-              Exercise
-            </label>
-
-            <select
-              id="exercise"
-              value={exercise}
-              onChange={(e) => setExercise(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                borderRadius: "10px",
-                border: "1px solid #cbd5e1",
-                marginBottom: "16px",
-              }}
-            >
-              <option>Glute Bridge</option>
-              <option>Bird Dog</option>
-              <option>Bodyweight Squat</option>
-            </select>
-
-            <p>
-              <strong>Selected:</strong> {exercise}
-            </p>
-            <p>
-              <strong>Status:</strong> Ready
-            </p>
-            <p>
-              <strong>Reps:</strong> 0
-            </p>
-            <p>
-              <strong>Form score:</strong> --
-            </p>
-
-            <button
-              style={{
-                marginTop: "12px",
-                padding: "12px 16px",
-                borderRadius: "10px",
-                border: "none",
-                background: "#0f172a",
-                color: "white",
-                cursor: "pointer",
-              }}
-            >
-              Start Session
-            </button>
-          </div>
-        </div>
+          Start Session
+        </button>
       </div>
     </main>
   );
